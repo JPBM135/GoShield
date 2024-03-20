@@ -2,20 +2,19 @@ package main
 
 import (
 	"net/http"
-	"os"
 
 	"jpbm135.go-shield/src/handlers"
 	"jpbm135.go-shield/src/utils"
 )
 
-var INFO_STRUC = map[string]interface{}{
+var INFO_STRUCTURE = map[string]interface{}{
 	"author":    "jpbm135",
 	"version":   "1.0.0",
 	"language":  "Go",
-	"goVersion": os.Environ(),
+	"goVersion": "1.20",
 }
 
-func notFoundHandler(writer http.ResponseWriter, request *http.Request) {
+func notFoundHandler(writer http.ResponseWriter) {
 	utils.WriteError(writer, "Not found", http.StatusNotFound)
 }
 
@@ -24,5 +23,13 @@ func Handlers() {
 		POST: handlers.POSTHashHandler,
 	}))
 
-	http.HandleFunc("/", notFoundHandler)
+	http.HandleFunc("/", utils.HandlerHelper("/", utils.HandlerHelperInput{
+		GET: func(writer http.ResponseWriter, request *http.Request) {
+			if request.URL.Path != "/" {
+				notFoundHandler(writer)
+				return
+			}
+			utils.WriteJSON(writer, INFO_STRUCTURE)
+		},
+	}))
 }
