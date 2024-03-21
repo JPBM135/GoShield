@@ -1,60 +1,41 @@
 package utils
 
 import (
+	"log"
 	"net/http"
 )
 
-type HandlerHelperInputFunction = func(writer http.ResponseWriter, request *http.Request)
-
-type HandlerHelperInput struct {
-	GET    HandlerHelperInputFunction
-	POST   HandlerHelperInputFunction
-	PUT    HandlerHelperInputFunction
-	DELETE HandlerHelperInputFunction
-	HEAD   HandlerHelperInputFunction
-}
+type HandlerFunc = func(writer http.ResponseWriter, request *http.Request)
 
 func defaultHandler(writer http.ResponseWriter, request *http.Request) {
 	var message string = "Method " + request.Method + " not allowed on path " + request.URL.Path
 
+	log.Println(message)
 	WriteError(writer, message, http.StatusMethodNotAllowed)
 }
 
-func HandlerHelper(path string, input HandlerHelperInput) func(http.ResponseWriter, *http.Request) {
-	if input.GET == nil {
-		input.GET = defaultHandler
+func HandlerHelper(input map[string]HandlerFunc) func(http.ResponseWriter, *http.Request) {
+	defaultHandlers := map[string]HandlerFunc{
+		http.MethodGet:     defaultHandler,
+		http.MethodPost:    defaultHandler,
+		http.MethodPut:     defaultHandler,
+		http.MethodDelete:  defaultHandler,
+		http.MethodHead:    defaultHandler,
+		http.MethodOptions: defaultHandler,
+		http.MethodPatch:   defaultHandler,
 	}
 
-	if input.POST == nil {
-		input.POST = defaultHandler
-	}
-
-	if input.PUT == nil {
-		input.PUT = defaultHandler
-	}
-
-	if input.DELETE == nil {
-		input.DELETE = defaultHandler
-	}
-
-	if input.HEAD == nil {
-		input.HEAD = defaultHandler
+	for method, handler := range input {
+		defaultHandlers[method] = handler
 	}
 
 	return func(writer http.ResponseWriter, request *http.Request) {
-		switch request.Method {
-		case "GET":
-			input.GET(writer, request)
-		case "POST":
-			input.POST(writer, request)
-		case "PUT":
-			input.PUT(writer, request)
-		case "DELETE":
-			input.DELETE(writer, request)
-		case "HEAD":
-			input.HEAD(writer, request)
-		default:
-			defaultHandler(writer, request)
+		handler, found := defaultHandlers[request.Method]
+
+		if !found {
+			handler = defaultHandler
 		}
+
+		handler(writer, request)
 	}
 }

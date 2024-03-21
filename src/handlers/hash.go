@@ -17,7 +17,7 @@ var algorithms = map[string]interface{}{
 }
 
 func POSTHashHandler(writer http.ResponseWriter, request *http.Request) {
-	if request.Method != "POST" {
+	if request.Method != http.MethodPost {
 		writer.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
@@ -30,29 +30,42 @@ func POSTHashHandler(writer http.ResponseWriter, request *http.Request) {
 
 	algorithm := "sha512"
 
-	if request.URL.Query().Get("algorithm") != "" {
-		_, found := algorithms[request.URL.Query().Get("algorithm")]
+	queryParamAlgorithm := request.URL.Query().Get("algorithm")
+
+	if queryParamAlgorithm != "" {
+		_, found := algorithms[queryParamAlgorithm]
 
 		if !found {
 
 			mapKeys := utils.GetMapKeys(algorithms)
 			message := "Invalid algorithm, supported algorithms are: " + strings.Join(mapKeys, ", ")
 
-			writer.WriteHeader(http.StatusBadRequest)
-			writer.Write([]byte(message))
+			utils.WriteError(writer, message, http.StatusBadRequest)
 			return
 		}
 
-		algorithm = request.URL.Query().Get("algorithm")
+		algorithm = queryParamAlgorithm
 	}
 
 	body := make([]byte, request.ContentLength)
-	request.Body.Read(body)
+	_, readBodyErr := request.Body.Read(body)
+
+	if readBodyErr != nil {
+		utils.WriteError(writer, "Error reading body", http.StatusBadRequest)
+		return
+	}
 
 	hash := algorithms[algorithm].(crypto.Hash).New()
 
-	hash.Write(body)
+	_, hashWriteErr := hash.Write(body)
+
+	if hashWriteErr != nil {
+		utils.WriteError(writer, "Error writing hash", http.StatusInternalServerError)
+		return
+	}
 
 	hexHash := hex.EncodeToString(hash.Sum(nil))
+
+	writer.WriteHeader(http.StatusOK)
 	writer.Write([]byte(hexHash))
 }
