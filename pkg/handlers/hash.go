@@ -17,10 +17,6 @@ var algorithms = map[string]interface{}{
 }
 
 func POSTHashHandler(writer http.ResponseWriter, request *http.Request) {
-	if request.Method != http.MethodPost {
-		writer.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 
 	if request.ContentLength == 0 {
 		writer.WriteHeader(http.StatusBadRequest)
