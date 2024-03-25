@@ -3,6 +3,8 @@ package handlers
 import (
 	"crypto"
 	"encoding/hex"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -16,17 +18,18 @@ var algorithms = map[string]interface{}{
 	"md5":    crypto.MD5,
 }
 
-func POSTHashHandler(writer http.ResponseWriter, request *http.Request) {
+func POSTHashHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 
-	if request.ContentLength == 0 {
-		writer.WriteHeader(http.StatusBadRequest)
-		writer.Write([]byte("No content"))
+	if r.ContentLength == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("No content"))
 		return
 	}
 
 	algorithm := "sha512"
 
-	queryParamAlgorithm := request.URL.Query().Get("algorithm")
+	queryParamAlgorithm := r.URL.Query().Get("algorithm")
 
 	if queryParamAlgorithm != "" {
 		_, found := algorithms[queryParamAlgorithm]
@@ -36,32 +39,33 @@ func POSTHashHandler(writer http.ResponseWriter, request *http.Request) {
 			mapKeys := utils.GetMapKeys(algorithms)
 			message := "Invalid algorithm, supported algorithms are: " + strings.Join(mapKeys, ", ")
 
-			utils.WriteError(writer, message, http.StatusBadRequest)
+			utils.WriteError(w, message, http.StatusBadRequest)
 			return
 		}
 
 		algorithm = queryParamAlgorithm
 	}
 
-	body := make([]byte, request.ContentLength)
-	_, readBodyErr := request.Body.Read(body)
+	//this line
+	bodyBytes, err := io.ReadAll(r.Body)
 
-	if readBodyErr != nil {
-		utils.WriteError(writer, "Error reading body", http.StatusBadRequest)
+	if err != nil {
+		fmt.Println("I am the error", err)
+		utils.WriteError(w, "Error reading body", http.StatusBadRequest)
 		return
 	}
 
 	hash := algorithms[algorithm].(crypto.Hash).New()
 
-	_, hashWriteErr := hash.Write(body)
+	_, hashWriteErr := hash.Write(bodyBytes)
 
 	if hashWriteErr != nil {
-		utils.WriteError(writer, "Error writing hash", http.StatusInternalServerError)
+		utils.WriteError(w, "Error writing hash", http.StatusInternalServerError)
 		return
 	}
 
 	hexHash := hex.EncodeToString(hash.Sum(nil))
 
-	writer.WriteHeader(http.StatusOK)
-	writer.Write([]byte(hexHash))
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(hexHash))
 }
